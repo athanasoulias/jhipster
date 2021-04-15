@@ -4,6 +4,7 @@ import com.iss.config.Constants;
 import com.iss.domain.Authority;
 import com.iss.domain.User;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.validation.constraints.*;
@@ -15,27 +16,24 @@ public class AdminUserDTO {
 
     private Long id;
 
-    @NotBlank
-    @Pattern(regexp = Constants.LOGIN_REGEX)
-    @Size(min = 1, max = 50)
     private String login;
 
-    @Size(max = 50)
     private String firstName;
 
-    @Size(max = 50)
+    private String fullName;
+
+    private String password;
+
     private String lastName;
 
-    @Email
-    @Size(min = 5, max = 254)
     private String email;
 
-    @Size(max = 256)
     private String imageUrl;
+
+    private boolean active = false;
 
     private boolean activated = false;
 
-    @Size(min = 2, max = 10)
     private String langKey;
 
     private String createdBy;
@@ -55,17 +53,9 @@ public class AdminUserDTO {
     public AdminUserDTO(User user) {
         this.id = user.getId();
         this.login = user.getLogin();
-        this.firstName = user.getFirstName();
-        this.lastName = user.getLastName();
-        this.email = user.getEmail();
-        this.activated = user.isActivated();
-        this.imageUrl = user.getImageUrl();
-        this.langKey = user.getLangKey();
-        this.createdBy = user.getCreatedBy();
-        this.createdDate = user.getCreatedDate();
-        this.lastModifiedBy = user.getLastModifiedBy();
-        this.lastModifiedDate = user.getLastModifiedDate();
-        this.authorities = user.getAuthorities().stream().map(Authority::getName).collect(Collectors.toSet());
+        this.fullName = user.getFullName();
+        this.authorities = new HashSet<>();
+        if (user.getRole() != null) this.authorities.add(user.getRole().name());
     }
 
     public Long getId() {
@@ -170,6 +160,30 @@ public class AdminUserDTO {
 
     public void setAuthorities(Set<String> authorities) {
         this.authorities = authorities;
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     // prettier-ignore

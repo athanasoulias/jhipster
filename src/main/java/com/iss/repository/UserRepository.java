@@ -20,23 +20,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     String USERS_BY_EMAIL_CACHE = "usersByEmail";
 
-    Optional<User> findOneByActivationKey(String activationKey);
-
-    List<User> findAllByActivatedIsFalseAndActivationKeyIsNotNullAndCreatedDateBefore(Instant dateTime);
-
-    Optional<User> findOneByResetKey(String resetKey);
-
-    Optional<User> findOneByEmailIgnoreCase(String email);
-
     Optional<User> findOneByLogin(String login);
 
-    @EntityGraph(attributePaths = "authorities")
     @Cacheable(cacheNames = USERS_BY_LOGIN_CACHE)
     Optional<User> findOneWithAuthoritiesByLogin(String login);
 
-    @EntityGraph(attributePaths = "authorities")
-    @Cacheable(cacheNames = USERS_BY_EMAIL_CACHE)
-    Optional<User> findOneWithAuthoritiesByEmailIgnoreCase(String email);
-
-    Page<User> findAllByIdNotNullAndActivatedIsTrue(Pageable pageable);
+    Page<User> findAllByIdNotNullAndActiveIsTrue(Pageable pageable);
 }

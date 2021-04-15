@@ -138,28 +138,6 @@ class AccountResourceIT {
 
     @Test
     @Transactional
-    void testRegisterInvalidLogin() throws Exception {
-        ManagedUserVM invalidUser = new ManagedUserVM();
-        invalidUser.setLogin("funky-log(n"); // <-- invalid
-        invalidUser.setPassword("password");
-        invalidUser.setFirstName("Funky");
-        invalidUser.setLastName("One");
-        invalidUser.setEmail("funky@example.com");
-        invalidUser.setActivated(true);
-        invalidUser.setImageUrl("http://placehold.it/50x50");
-        invalidUser.setLangKey(Constants.DEFAULT_LANGUAGE);
-        invalidUser.setAuthorities(Collections.singleton(AuthoritiesConstants.USER));
-
-        restAccountMockMvc
-            .perform(post("/api/register").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(invalidUser)))
-            .andExpect(status().isBadRequest());
-
-        Optional<User> user = userRepository.findOneByEmailIgnoreCase("funky@example.com");
-        assertThat(user).isEmpty();
-    }
-
-    @Test
-    @Transactional
     void testRegisterInvalidEmail() throws Exception {
         ManagedUserVM invalidUser = new ManagedUserVM();
         invalidUser.setLogin("bob");
@@ -222,56 +200,6 @@ class AccountResourceIT {
 
         Optional<User> user = userRepository.findOneByLogin("bob");
         assertThat(user).isEmpty();
-    }
-
-    @Test
-    @Transactional
-    void testRegisterDuplicateLogin() throws Exception {
-        // First registration
-        ManagedUserVM firstUser = new ManagedUserVM();
-        firstUser.setLogin("alice");
-        firstUser.setPassword("password");
-        firstUser.setFirstName("Alice");
-        firstUser.setLastName("Something");
-        firstUser.setEmail("alice@example.com");
-        firstUser.setImageUrl("http://placehold.it/50x50");
-        firstUser.setLangKey(Constants.DEFAULT_LANGUAGE);
-        firstUser.setAuthorities(Collections.singleton(AuthoritiesConstants.USER));
-
-        // Duplicate login, different email
-        ManagedUserVM secondUser = new ManagedUserVM();
-        secondUser.setLogin(firstUser.getLogin());
-        secondUser.setPassword(firstUser.getPassword());
-        secondUser.setFirstName(firstUser.getFirstName());
-        secondUser.setLastName(firstUser.getLastName());
-        secondUser.setEmail("alice2@example.com");
-        secondUser.setImageUrl(firstUser.getImageUrl());
-        secondUser.setLangKey(firstUser.getLangKey());
-        secondUser.setCreatedBy(firstUser.getCreatedBy());
-        secondUser.setCreatedDate(firstUser.getCreatedDate());
-        secondUser.setLastModifiedBy(firstUser.getLastModifiedBy());
-        secondUser.setLastModifiedDate(firstUser.getLastModifiedDate());
-        secondUser.setAuthorities(new HashSet<>(firstUser.getAuthorities()));
-
-        // First user
-        restAccountMockMvc
-            .perform(post("/api/register").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(firstUser)))
-            .andExpect(status().isCreated());
-
-        // Second (non activated) user
-        restAccountMockMvc
-            .perform(post("/api/register").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(secondUser)))
-            .andExpect(status().isCreated());
-
-        Optional<User> testUser = userRepository.findOneByEmailIgnoreCase("alice2@example.com");
-        assertThat(testUser).isPresent();
-        testUser.get().setActivated(true);
-        userRepository.save(testUser.get());
-
-        // Second (already activated) user
-        restAccountMockMvc
-            .perform(post("/api/register").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(secondUser)))
-            .andExpect(status().is4xxClientError());
     }
 
     @Test
@@ -341,9 +269,8 @@ class AccountResourceIT {
 
         Optional<User> testUser4 = userRepository.findOneByLogin("test-register-duplicate-email-3");
         assertThat(testUser4).isPresent();
-        assertThat(testUser4.get().getEmail()).isEqualTo("test-register-duplicate-email@example.com");
 
-        testUser4.get().setActivated(true);
+        testUser4.get().setActive(true);
         userService.updateUser((new AdminUserDTO(testUser4.get())));
 
         // Register 4th (already activated) user
@@ -372,70 +299,6 @@ class AccountResourceIT {
 
         Optional<User> userDup = userRepository.findOneWithAuthoritiesByLogin("badguy");
         assertThat(userDup).isPresent();
-        assertThat(userDup.get().getAuthorities())
-            .hasSize(1)
-            .containsExactly(authorityRepository.findById(AuthoritiesConstants.USER).get());
-    }
-
-    @Test
-    @Transactional
-    void testActivateAccount() throws Exception {
-        final String activationKey = "some activation key";
-        User user = new User();
-        user.setLogin("activate-account");
-        user.setEmail("activate-account@example.com");
-        user.setPassword(RandomStringUtils.random(60));
-        user.setActivated(false);
-        user.setActivationKey(activationKey);
-
-        userRepository.saveAndFlush(user);
-
-        restAccountMockMvc.perform(get("/api/activate?key={activationKey}", activationKey)).andExpect(status().isOk());
-
-        user = userRepository.findOneByLogin(user.getLogin()).orElse(null);
-        assertThat(user.isActivated()).isTrue();
-    }
-
-    @Test
-    @Transactional
-    void testActivateAccountWithWrongKey() throws Exception {
-        restAccountMockMvc.perform(get("/api/activate?key=wrongActivationKey")).andExpect(status().isInternalServerError());
-    }
-
-    @Test
-    @Transactional
-    @WithMockUser("save-account")
-    void testSaveAccount() throws Exception {
-        User user = new User();
-        user.setLogin("save-account");
-        user.setEmail("save-account@example.com");
-        user.setPassword(RandomStringUtils.random(60));
-        user.setActivated(true);
-        userRepository.saveAndFlush(user);
-
-        AdminUserDTO userDTO = new AdminUserDTO();
-        userDTO.setLogin("not-used");
-        userDTO.setFirstName("firstname");
-        userDTO.setLastName("lastname");
-        userDTO.setEmail("save-account@example.com");
-        userDTO.setActivated(false);
-        userDTO.setImageUrl("http://placehold.it/50x50");
-        userDTO.setLangKey(Constants.DEFAULT_LANGUAGE);
-        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.ADMIN));
-
-        restAccountMockMvc
-            .perform(post("/api/account").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(userDTO)))
-            .andExpect(status().isOk());
-
-        User updatedUser = userRepository.findOneWithAuthoritiesByLogin(user.getLogin()).orElse(null);
-        assertThat(updatedUser.getFirstName()).isEqualTo(userDTO.getFirstName());
-        assertThat(updatedUser.getLastName()).isEqualTo(userDTO.getLastName());
-        assertThat(updatedUser.getEmail()).isEqualTo(userDTO.getEmail());
-        assertThat(updatedUser.getLangKey()).isEqualTo(userDTO.getLangKey());
-        assertThat(updatedUser.getPassword()).isEqualTo(user.getPassword());
-        assertThat(updatedUser.getImageUrl()).isEqualTo(userDTO.getImageUrl());
-        assertThat(updatedUser.isActivated()).isTrue();
-        assertThat(updatedUser.getAuthorities()).isEmpty();
     }
 
     @Test
@@ -444,9 +307,8 @@ class AccountResourceIT {
     void testSaveInvalidEmail() throws Exception {
         User user = new User();
         user.setLogin("save-invalid-email");
-        user.setEmail("save-invalid-email@example.com");
         user.setPassword(RandomStringUtils.random(60));
-        user.setActivated(true);
+        user.setActive(true);
 
         userRepository.saveAndFlush(user);
 
@@ -463,8 +325,6 @@ class AccountResourceIT {
         restAccountMockMvc
             .perform(post("/api/account").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(userDTO)))
             .andExpect(status().isBadRequest());
-
-        assertThat(userRepository.findOneByEmailIgnoreCase("invalid email")).isNotPresent();
     }
 
     @Test
@@ -473,16 +333,14 @@ class AccountResourceIT {
     void testSaveExistingEmail() throws Exception {
         User user = new User();
         user.setLogin("save-existing-email");
-        user.setEmail("save-existing-email@example.com");
         user.setPassword(RandomStringUtils.random(60));
-        user.setActivated(true);
+        user.setActive(true);
         userRepository.saveAndFlush(user);
 
         User anotherUser = new User();
         anotherUser.setLogin("save-existing-email2");
-        anotherUser.setEmail("save-existing-email2@example.com");
         anotherUser.setPassword(RandomStringUtils.random(60));
-        anotherUser.setActivated(true);
+        anotherUser.setActive(true);
 
         userRepository.saveAndFlush(anotherUser);
 
@@ -501,36 +359,6 @@ class AccountResourceIT {
             .andExpect(status().isBadRequest());
 
         User updatedUser = userRepository.findOneByLogin("save-existing-email").orElse(null);
-        assertThat(updatedUser.getEmail()).isEqualTo("save-existing-email@example.com");
-    }
-
-    @Test
-    @Transactional
-    @WithMockUser("save-existing-email-and-login")
-    void testSaveExistingEmailAndLogin() throws Exception {
-        User user = new User();
-        user.setLogin("save-existing-email-and-login");
-        user.setEmail("save-existing-email-and-login@example.com");
-        user.setPassword(RandomStringUtils.random(60));
-        user.setActivated(true);
-        userRepository.saveAndFlush(user);
-
-        AdminUserDTO userDTO = new AdminUserDTO();
-        userDTO.setLogin("not-used");
-        userDTO.setFirstName("firstname");
-        userDTO.setLastName("lastname");
-        userDTO.setEmail("save-existing-email-and-login@example.com");
-        userDTO.setActivated(false);
-        userDTO.setImageUrl("http://placehold.it/50x50");
-        userDTO.setLangKey(Constants.DEFAULT_LANGUAGE);
-        userDTO.setAuthorities(Collections.singleton(AuthoritiesConstants.ADMIN));
-
-        restAccountMockMvc
-            .perform(post("/api/account").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(userDTO)))
-            .andExpect(status().isOk());
-
-        User updatedUser = userRepository.findOneByLogin("save-existing-email-and-login").orElse(null);
-        assertThat(updatedUser.getEmail()).isEqualTo("save-existing-email-and-login@example.com");
     }
 
     @Test
@@ -541,7 +369,6 @@ class AccountResourceIT {
         String currentPassword = RandomStringUtils.random(60);
         user.setPassword(passwordEncoder.encode(currentPassword));
         user.setLogin("change-password-wrong-existing-password");
-        user.setEmail("change-password-wrong-existing-password@example.com");
         userRepository.saveAndFlush(user);
 
         restAccountMockMvc
@@ -565,7 +392,6 @@ class AccountResourceIT {
         String currentPassword = RandomStringUtils.random(60);
         user.setPassword(passwordEncoder.encode(currentPassword));
         user.setLogin("change-password");
-        user.setEmail("change-password@example.com");
         userRepository.saveAndFlush(user);
 
         restAccountMockMvc
@@ -588,7 +414,6 @@ class AccountResourceIT {
         String currentPassword = RandomStringUtils.random(60);
         user.setPassword(passwordEncoder.encode(currentPassword));
         user.setLogin("change-password-too-small");
-        user.setEmail("change-password-too-small@example.com");
         userRepository.saveAndFlush(user);
 
         String newPassword = RandomStringUtils.random(ManagedUserVM.PASSWORD_MIN_LENGTH - 1);
@@ -610,10 +435,9 @@ class AccountResourceIT {
     @WithMockUser("change-password-too-long")
     void testChangePasswordTooLong() throws Exception {
         User user = new User();
-        String currentPassword = RandomStringUtils.random(60);
+        String currentPassword = RandomStringUtils.random(105);
         user.setPassword(passwordEncoder.encode(currentPassword));
         user.setLogin("change-password-too-long");
-        user.setEmail("change-password-too-long@example.com");
         userRepository.saveAndFlush(user);
 
         String newPassword = RandomStringUtils.random(ManagedUserVM.PASSWORD_MAX_LENGTH + 1);
@@ -638,7 +462,6 @@ class AccountResourceIT {
         String currentPassword = RandomStringUtils.random(60);
         user.setPassword(passwordEncoder.encode(currentPassword));
         user.setLogin("change-password-empty");
-        user.setEmail("change-password-empty@example.com");
         userRepository.saveAndFlush(user);
 
         restAccountMockMvc
@@ -655,108 +478,15 @@ class AccountResourceIT {
 
     @Test
     @Transactional
-    void testRequestPasswordReset() throws Exception {
-        User user = new User();
-        user.setPassword(RandomStringUtils.random(60));
-        user.setActivated(true);
-        user.setLogin("password-reset");
-        user.setEmail("password-reset@example.com");
-        userRepository.saveAndFlush(user);
-
-        restAccountMockMvc
-            .perform(post("/api/account/reset-password/init").content("password-reset@example.com"))
-            .andExpect(status().isOk());
-    }
-
-    @Test
-    @Transactional
     void testRequestPasswordResetUpperCaseEmail() throws Exception {
         User user = new User();
         user.setPassword(RandomStringUtils.random(60));
-        user.setActivated(true);
+        user.setActive(true);
         user.setLogin("password-reset-upper-case");
-        user.setEmail("password-reset-upper-case@example.com");
         userRepository.saveAndFlush(user);
 
         restAccountMockMvc
             .perform(post("/api/account/reset-password/init").content("password-reset-upper-case@EXAMPLE.COM"))
             .andExpect(status().isOk());
-    }
-
-    @Test
-    void testRequestPasswordResetWrongEmail() throws Exception {
-        restAccountMockMvc
-            .perform(post("/api/account/reset-password/init").content("password-reset-wrong-email@example.com"))
-            .andExpect(status().isOk());
-    }
-
-    @Test
-    @Transactional
-    void testFinishPasswordReset() throws Exception {
-        User user = new User();
-        user.setPassword(RandomStringUtils.random(60));
-        user.setLogin("finish-password-reset");
-        user.setEmail("finish-password-reset@example.com");
-        user.setResetDate(Instant.now().plusSeconds(60));
-        user.setResetKey("reset key");
-        userRepository.saveAndFlush(user);
-
-        KeyAndPasswordVM keyAndPassword = new KeyAndPasswordVM();
-        keyAndPassword.setKey(user.getResetKey());
-        keyAndPassword.setNewPassword("new password");
-
-        restAccountMockMvc
-            .perform(
-                post("/api/account/reset-password/finish")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(TestUtil.convertObjectToJsonBytes(keyAndPassword))
-            )
-            .andExpect(status().isOk());
-
-        User updatedUser = userRepository.findOneByLogin(user.getLogin()).orElse(null);
-        assertThat(passwordEncoder.matches(keyAndPassword.getNewPassword(), updatedUser.getPassword())).isTrue();
-    }
-
-    @Test
-    @Transactional
-    void testFinishPasswordResetTooSmall() throws Exception {
-        User user = new User();
-        user.setPassword(RandomStringUtils.random(60));
-        user.setLogin("finish-password-reset-too-small");
-        user.setEmail("finish-password-reset-too-small@example.com");
-        user.setResetDate(Instant.now().plusSeconds(60));
-        user.setResetKey("reset key too small");
-        userRepository.saveAndFlush(user);
-
-        KeyAndPasswordVM keyAndPassword = new KeyAndPasswordVM();
-        keyAndPassword.setKey(user.getResetKey());
-        keyAndPassword.setNewPassword("foo");
-
-        restAccountMockMvc
-            .perform(
-                post("/api/account/reset-password/finish")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(TestUtil.convertObjectToJsonBytes(keyAndPassword))
-            )
-            .andExpect(status().isBadRequest());
-
-        User updatedUser = userRepository.findOneByLogin(user.getLogin()).orElse(null);
-        assertThat(passwordEncoder.matches(keyAndPassword.getNewPassword(), updatedUser.getPassword())).isFalse();
-    }
-
-    @Test
-    @Transactional
-    void testFinishPasswordResetWrongKey() throws Exception {
-        KeyAndPasswordVM keyAndPassword = new KeyAndPasswordVM();
-        keyAndPassword.setKey("wrong reset key");
-        keyAndPassword.setNewPassword("new password");
-
-        restAccountMockMvc
-            .perform(
-                post("/api/account/reset-password/finish")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(TestUtil.convertObjectToJsonBytes(keyAndPassword))
-            )
-            .andExpect(status().isInternalServerError());
     }
 }

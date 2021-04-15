@@ -2,6 +2,7 @@ package com.iss.service.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.iss.domain.RoleType;
 import com.iss.domain.User;
 import com.iss.service.dto.AdminUserDTO;
 import com.iss.service.dto.UserDTO;
@@ -31,13 +32,8 @@ class UserMapperTest {
         user = new User();
         user.setLogin(DEFAULT_LOGIN);
         user.setPassword(RandomStringUtils.random(60));
-        user.setActivated(true);
-        user.setEmail("johndoe@localhost");
-        user.setFirstName("john");
-        user.setLastName("doe");
-        user.setImageUrl("image_url");
-        user.setLangKey("en");
-
+        user.setActive(true);
+        user.setFullName("John Doe");
         userDto = new AdminUserDTO(user);
     }
 
@@ -66,7 +62,7 @@ class UserMapperTest {
     @Test
     void userDTOsToUsersWithAuthoritiesStringShouldMapToUsersWithAuthoritiesDomain() {
         Set<String> authoritiesAsString = new HashSet<>();
-        authoritiesAsString.add("ADMIN");
+        authoritiesAsString.add("ROLE_ADMIN");
         userDto.setAuthorities(authoritiesAsString);
 
         List<AdminUserDTO> usersDto = new ArrayList<>();
@@ -75,9 +71,7 @@ class UserMapperTest {
         List<User> users = userMapper.userDTOsToUsers(usersDto);
 
         assertThat(users).isNotEmpty().size().isEqualTo(1);
-        assertThat(users.get(0).getAuthorities()).isNotNull();
-        assertThat(users.get(0).getAuthorities()).isNotEmpty();
-        assertThat(users.get(0).getAuthorities().iterator().next().getName()).isEqualTo("ADMIN");
+        assertThat(users.get(0).getRole() != null);
     }
 
     @Test
@@ -90,22 +84,20 @@ class UserMapperTest {
         List<User> users = userMapper.userDTOsToUsers(usersDto);
 
         assertThat(users).isNotEmpty().size().isEqualTo(1);
-        assertThat(users.get(0).getAuthorities()).isNotNull();
-        assertThat(users.get(0).getAuthorities()).isEmpty();
+        assertThat(users.get(0).getRole() == null);
     }
 
     @Test
     void userDTOToUserMapWithAuthoritiesStringShouldReturnUserWithAuthorities() {
         Set<String> authoritiesAsString = new HashSet<>();
-        authoritiesAsString.add("ADMIN");
+        authoritiesAsString.add("ROLE_ADMIN");
         userDto.setAuthorities(authoritiesAsString);
 
         User user = userMapper.userDTOToUser(userDto);
 
         assertThat(user).isNotNull();
-        assertThat(user.getAuthorities()).isNotNull();
-        assertThat(user.getAuthorities()).isNotEmpty();
-        assertThat(user.getAuthorities().iterator().next().getName()).isEqualTo("ADMIN");
+        assertThat(user.getRole()).isNotNull();
+        assertThat(user.getRole().equals(RoleType.ROLE_ADMIN));
     }
 
     @Test
@@ -115,8 +107,7 @@ class UserMapperTest {
         User user = userMapper.userDTOToUser(userDto);
 
         assertThat(user).isNotNull();
-        assertThat(user.getAuthorities()).isNotNull();
-        assertThat(user.getAuthorities()).isEmpty();
+        assertThat(user.getRole() == null);
     }
 
     @Test

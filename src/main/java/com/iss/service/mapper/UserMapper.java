@@ -1,6 +1,7 @@
 package com.iss.service.mapper;
 
 import com.iss.domain.Authority;
+import com.iss.domain.RoleType;
 import com.iss.domain.User;
 import com.iss.service.dto.AdminUserDTO;
 import com.iss.service.dto.UserDTO;
@@ -47,14 +48,13 @@ public class UserMapper {
             User user = new User();
             user.setId(userDTO.getId());
             user.setLogin(userDTO.getLogin());
-            user.setFirstName(userDTO.getFirstName());
-            user.setLastName(userDTO.getLastName());
-            user.setEmail(userDTO.getEmail());
-            user.setImageUrl(userDTO.getImageUrl());
-            user.setActivated(userDTO.isActivated());
-            user.setLangKey(userDTO.getLangKey());
-            Set<Authority> authorities = this.authoritiesFromStrings(userDTO.getAuthorities());
-            user.setAuthorities(authorities);
+            if (userDTO.getFullName() != null) user.setFullName(userDTO.getFullName()); else user.setFullName(
+                userDTO.getFirstName() + " " + userDTO.getLastName()
+            );
+            user.setActive(userDTO.isActive());
+            if (userDTO.getAuthorities() != null && userDTO.getAuthorities().size() > 0) user.setRole(
+                RoleType.valueOf((String) userDTO.getAuthorities().toArray()[0])
+            );
             return user;
         }
     }

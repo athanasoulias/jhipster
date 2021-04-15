@@ -60,6 +60,6 @@ public class PublicUserResource {
      */
     @GetMapping("/authorities")
     public List<String> getAuthorities() {
-        return userService.getAuthorities();
+        return null;
     }
 }

@@ -42,8 +42,7 @@ class UserJWTControllerIT {
     void testAuthorize() throws Exception {
         User user = new User();
         user.setLogin("user-jwt-controller");
-        user.setEmail("user-jwt-controller@example.com");
-        user.setActivated(true);
+        user.setActive(true);
         user.setPassword(passwordEncoder.encode("test"));
 
         userRepository.saveAndFlush(user);
@@ -65,8 +64,7 @@ class UserJWTControllerIT {
     void testAuthorizeWithRememberMe() throws Exception {
         User user = new User();
         user.setLogin("user-jwt-controller-remember-me");
-        user.setEmail("user-jwt-controller-remember-me@example.com");
-        user.setActivated(true);
+        user.setActive(true);
         user.setPassword(passwordEncoder.encode("test"));
 
         userRepository.saveAndFlush(user);
